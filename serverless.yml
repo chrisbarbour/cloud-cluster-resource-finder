@@ -5,18 +5,138 @@ provider:
   runtime: java8
   timeout: 30
   region: eu-west-1
+  iamRoleStatements:
+    - Effect: Allow
+      Action: [ 'iot:*' ]
+      Resource: '*'
+    - Effect: Allow
+      Action: ['s3:*']
+      Resource:
+        - Fn::Join:
+            - ''
+            - - 'arn:aws:s3:::'
+              - Ref: ResourceInfoBucket
+        - Fn::Join:
+            - ''
+            - - 'arn:aws:s3:::'
+              - Ref: ResourceInfoBucket
+              - '/*'
+    - Effect: Allow
+      Resource: '*'
+      Action:
+        - iam:Get*
+        - iam:List*
+        - kms:ListKeys
+        - sns:List*
+        - sqs:List*
+        - lambda:Get*
+        - lambda:List*
+        - ec2:Describe*
+        - apigateway:GET
+        - s3:List*
+        - rds:Describe*
+        - ecs:Describe*
+        - dynamodb:Describe*
+        - dynamodb:List*
+
+custom:
+  properties:
+    snsEvents:
+      - sns:
+          topicName: CloudClusterInitialLoadTopic
+          arn: { Fn::Join: ['', [ 'arn:aws:sns:', { Ref: 'AWS::Region' }, ':', { Ref: 'AWS::AccountId' }, ':', CloudClusterInitialLoadTopic ] ] }
+
 
 package:
   artifact: target/cloud-resource-finder-1.0-SNAPSHOT.jar
 
 functions:
-  resourceFinder:
-    handler: com.cluster.Reactor
+
+  resourceInfoFinder:
+    handler: com.cluster.ApiReactor
+    environment:
+      BUCKET: { Ref: ResourceInfoBucket }
+      LOAD_TOPIC: { Ref: InitialLoadTopic }
+    role: LambdaFinderRole
     events:
       - http:
           path: status
           method: get
           cors: true
+      - http:
+          path: reset
+          method: get
+          cors: true
+      - http:
+          path: load
+          method: get
+          cors: true
+      - http:
+          path: notificationEndpoint
+          method: get
+          cors: true
+
+  lamdbaFinder:
+    handler: com.cluster.SnsReactor
+    environment:
+      BUCKET: { Ref: ResourceInfoBucket }
+      RESOURCE: 'lambda'
+    events: ${self:custom.properties.snsEvents}
 
 resources:
   Resources:
+    ResourceInfoBucket:
+      Type: AWS::S3::Bucket
+    InitialLoadTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: 'CloudClusterInitialLoadTopic'
+
+    LambdaFinderRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: '/'
+        RoleName: LambdaFinderRole
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: myPolicyName
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource:
+                    - 'Fn::Join':
+                      - ':'
+                      - - 'arn:aws:logs'
+                        - Ref: 'AWS::Region'
+                        - Ref: 'AWS::AccountId'
+                        - 'log-group:/aws/lambda/*:*:*'
+                - Effect: Allow
+                  Action: [ 's3:*' ]
+                  Resource:
+                    - Fn::Join:
+                        - ''
+                        - - 'arn:aws:s3:::'
+                          - Ref: ResourceInfoBucket
+                    - Fn::Join:
+                        - ''
+                        - - 'arn:aws:s3:::'
+                          - Ref: ResourceInfoBucket
+                          - '/*'
+                - Effect: Allow
+                  Action: [ 'sns:publish' ]
+                  Resource: { Ref: InitialLoadTopic }
+                - Effect: Allow
+                  Action: [ 'iot:describe*' ]
+                  Resource: '*'
