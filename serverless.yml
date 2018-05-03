@@ -1,0 +1,22 @@
+service: cloud-resource-finder
+
+provider:
+  name: aws
+  runtime: java8
+  timeout: 30
+  region: eu-west-1
+
+package:
+  artifact: target/cloud-resource-finder-1.0-SNAPSHOT.jar
+
+functions:
+  resourceFinder:
+    handler: com.cluster.Reactor
+    events:
+      - http:
+          path: status
+          method: get
+          cors: true
+
+resources:
+  Resources:
