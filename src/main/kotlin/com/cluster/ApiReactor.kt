@@ -85,10 +85,10 @@ class ApiReactor(
 
     fun handleStatus(): Pair<Int, String>{
         val keys = s3Client.listObjects(resourceBucket).objectSummaries.map { it.key }
-        val status = (if(keys.isEmpty()) "Not" else "") + "Started"
         fun listString(list: Collection<*>) = list.foldIndexed(StringBuilder()){i, acc, it -> acc.append("\"$it\"").append(if(i<list.size-1){", "}else {""})}.toString()
         val loaded = keys.map{ it.substringBefore('/')}.toSet().filter { it != "loading" }
-        val toLoad = listOf("lambda", "ec2", "ecs", "dynamodb").filter { !loaded.contains(it) }
+        val toLoad = listOf("lambda", "ec2").filter { !loaded.contains(it) }
+        val status = if(toLoad.isEmpty()){"Finished"}else((if(keys.isEmpty()) "Not" else "") + "Started")
         return 200 to "{\"status\":\"$status\", \"loaded\":[${listString(loaded)}], \"waitingOn\":[${listString(toLoad)}]}"
     }
 }
