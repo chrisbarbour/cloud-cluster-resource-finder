@@ -87,6 +87,12 @@ functions:
       BUCKET: { Ref: ResourceInfoBucket }
       RESOURCE: 'lambda'
     events: ${self:custom.properties.snsEvents}
+  ec2Finder:
+    handler: com.cluster.SnsReactor
+    environment:
+      BUCKET: { Ref: ResourceInfoBucket }
+      RESOURCE: 'ec2'
+    events: ${self:custom.properties.snsEvents}
 
 resources:
   Resources:

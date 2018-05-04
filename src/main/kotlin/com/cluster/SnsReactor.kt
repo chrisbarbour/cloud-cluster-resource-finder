@@ -23,6 +23,7 @@ class SnsReactor(
     override fun handleRequest(event: SNSEvent, context: Context): String {
         when(resourceType){
             "lambda" -> lambda()
+            "ec2" -> lambda()
         }
         return "Done"
     }
