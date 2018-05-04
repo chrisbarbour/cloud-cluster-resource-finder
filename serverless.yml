@@ -143,7 +143,7 @@ resources:
                   Action: [ 'sns:publish' ]
                   Resource: { Ref: InitialLoadTopic }
                 - Effect: Allow
-                  Action: [ 'iot:DescribeEndpoint'  ]
+                  Action: [ 'iot:DescribeEndpoint', 'iot:Connect','iot:Publish' ]
                   Resource: '*'
                 - Effect: Allow
                   Action: [ 'sts:AssumeRole' ]

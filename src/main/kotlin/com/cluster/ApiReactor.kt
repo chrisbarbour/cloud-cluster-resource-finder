@@ -10,21 +10,23 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.AmazonS3Client
 import com.amazonaws.services.s3.model.DeleteObjectsRequest
+import com.amazonaws.services.s3.model.ObjectMetadata
 import com.amazonaws.services.securitytoken.AWSSecurityTokenService
 import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClient
 import com.amazonaws.services.securitytoken.model.AssumeRoleRequest
 import com.amazonaws.services.sns.AmazonSNS
 import com.amazonaws.services.sns.AmazonSNSClient
+import java.io.ByteArrayInputStream
 import java.util.*
 
 class ApiReactor(
         val s3Client: AmazonS3 = AwsConfigurator.defaultClient(AmazonS3Client.builder()),
         val snsClient: AmazonSNS = AwsConfigurator.defaultClient(AmazonSNSClient.builder()),
-        val iotClient: AWSIot = AwsConfigurator.defaultClient(AWSIotClient.builder()),
         val stsClient: AWSSecurityTokenService = AwsConfigurator.defaultClient(AWSSecurityTokenServiceClient.builder()),
         val resourceBucket: String = System.getenv("BUCKET"),
         val loadTopic: String = System.getenv("LOAD_TOPIC"),
-        val iotRoleArn: String = System.getenv("IOT_ROLE_ARN")
+        val iotRoleArn: String = System.getenv("IOT_ROLE_ARN"),
+        val iotPublisher: IotPublisher = IotPublisher()
 ): RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
     override fun handleRequest(apiGatewayProxyRequestEvent: APIGatewayProxyRequestEvent, context: Context): APIGatewayProxyResponseEvent {
         val response = when(apiGatewayProxyRequestEvent.path){
@@ -54,12 +56,17 @@ class ApiReactor(
     }
 
     fun handleNotificationEndpoint(): Pair<Int, String>{
-       return 200 to iotClient.describeEndpoint(DescribeEndpointRequest()).endpointAddress
+       return 200 to iotPublisher.endpoint()
     }
 
     fun handleLoad(): Pair<Int, String>{
-        snsClient.publish(loadTopic, "Load")
-        return 200 to "Loading"
+        return if(s3Client.listObjects(resourceBucket).objectSummaries.map { it.key }.isEmpty()) {
+            s3Client.putObject(resourceBucket, "loading", ByteArrayInputStream("".toByteArray()), ObjectMetadata())
+            iotPublisher.postEvent("loading")
+            snsClient.publish(loadTopic, "Load")
+            200 to "Loading"
+        }
+        else 200 to "Already Loading"
     }
 
     fun handleReset(): Pair<Int, String>{
@@ -71,6 +78,7 @@ class ApiReactor(
         else {
             println("Deleting all objects")
             s3Client.deleteObjects(DeleteObjectsRequest(resourceBucket).withKeys(*keys.toTypedArray()))
+            iotPublisher.postEvent("reset")
         }
         return 200 to keys.fold(StringBuilder()){acc, it -> acc.append(it).append("\n")}.toString()
     }
@@ -79,7 +87,7 @@ class ApiReactor(
         val keys = s3Client.listObjects(resourceBucket).objectSummaries.map { it.key }
         val status = (if(keys.isEmpty()) "Not" else "") + "Started"
         fun listString(list: Collection<*>) = list.foldIndexed(StringBuilder()){i, acc, it -> acc.append("\"$it\"").append(if(i<list.size-1){", "}else {""})}.toString()
-        val loaded = keys.map{ it.substringBefore('/')}.toSet()
+        val loaded = keys.map{ it.substringBefore('/')}.toSet().filter { it != "loading" }
         val toLoad = listOf("lambda", "ec2", "ecs", "dynamodb").filter { !loaded.contains(it) }
         return 200 to "{\"status\":\"$status\", \"loaded\":[${listString(loaded)}], \"waitingOn\":[${listString(toLoad)}]}"
     }
