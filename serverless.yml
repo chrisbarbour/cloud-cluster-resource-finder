@@ -7,7 +7,7 @@ provider:
   region: eu-west-1
   iamRoleStatements:
     - Effect: Allow
-      Action: [ 'iot:*' ]
+      Action: [ 'iot:DescribeEndpoint', 'iot:Connect','iot:Publish' ]
       Resource: '*'
     - Effect: Allow
       Action: ['s3:*']
@@ -57,6 +57,7 @@ functions:
     environment:
       BUCKET: { Ref: ResourceInfoBucket }
       LOAD_TOPIC: { Ref: InitialLoadTopic }
+      IOT_ROLE_ARN: { Fn::GetAtt: [ 'iotPublicSubscriberRole', 'Arn' ] }
     role: LambdaFinderRole
     events:
       - http:
@@ -69,6 +70,10 @@ functions:
           cors: true
       - http:
           path: load
+          method: get
+          cors: true
+      - http:
+          path: iotAccess
           method: get
           cors: true
       - http:
@@ -138,5 +143,31 @@ resources:
                   Action: [ 'sns:publish' ]
                   Resource: { Ref: InitialLoadTopic }
                 - Effect: Allow
-                  Action: [ 'iot:describe*' ]
+                  Action: [ 'iot:DescribeEndpoint'  ]
+                  Resource: '*'
+                - Effect: Allow
+                  Action: [ 'sts:AssumeRole' ]
+                  Resource: { Fn::GetAtt: [ iotPublicSubscriberRole, 'Arn' ] }
+
+    iotPublicSubscriberRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: '/'
+        RoleName: iotPublicSubscriberRole
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal: { AWS: { Fn::Join: ['', ['arn:aws:iam::',{ Ref: 'AWS::AccountId' },':root']]} }
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: allowIotAccessPolicy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - iot:Connect
+                    - iot:Subscribe
+                    - iot:Receive
                   Resource: '*'
