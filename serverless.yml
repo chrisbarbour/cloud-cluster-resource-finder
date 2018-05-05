@@ -85,12 +85,14 @@ functions:
     handler: com.cluster.SnsReactor
     environment:
       BUCKET: { Ref: ResourceInfoBucket }
+      ACCOUNT: { Ref: AWS::AccountId }
       RESOURCE: 'lambda'
     events: ${self:custom.properties.snsEvents}
   ec2Finder:
     handler: com.cluster.SnsReactor
     environment:
       BUCKET: { Ref: ResourceInfoBucket }
+      ACCOUNT: { Ref: AWS::AccountId }
       RESOURCE: 'ec2'
     events: ${self:custom.properties.snsEvents}
 
