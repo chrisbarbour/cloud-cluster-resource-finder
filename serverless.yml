@@ -56,6 +56,7 @@ functions:
     handler: com.cluster.ApiReactor
     environment:
       BUCKET: { Ref: ResourceInfoBucket }
+      ACCOUNT: { Ref: AWS::AccountId }
       LOAD_TOPIC: { Ref: InitialLoadTopic }
       IOT_ROLE_ARN: { Fn::GetAtt: [ 'iotPublicSubscriberRole', 'Arn' ] }
     role: LambdaFinderRole
@@ -78,6 +79,14 @@ functions:
           cors: true
       - http:
           path: notificationEndpoint
+          method: get
+          cors: true
+      - http:
+          path: accounts
+          method: get
+          cors: true
+      - http:
+          path: accounts/{accountId}
           method: get
           cors: true
 

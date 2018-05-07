@@ -1,8 +1,5 @@
 package com.cluster
 
-import com.amazonaws.services.iot.AWSIot
-import com.amazonaws.services.iot.AWSIotClient
-import com.amazonaws.services.iot.model.DescribeEndpointRequest
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestHandler
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent
@@ -16,6 +13,7 @@ import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClient
 import com.amazonaws.services.securitytoken.model.AssumeRoleRequest
 import com.amazonaws.services.sns.AmazonSNS
 import com.amazonaws.services.sns.AmazonSNSClient
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.io.ByteArrayInputStream
 import java.util.*
 
@@ -26,6 +24,7 @@ class ApiReactor(
         val resourceBucket: String = System.getenv("BUCKET"),
         val loadTopic: String = System.getenv("LOAD_TOPIC"),
         val iotRoleArn: String = System.getenv("IOT_ROLE_ARN"),
+        val accountId: String = System.getenv("ACCOUNT"),
         val iotPublisher: IotPublisher = IotPublisher()
 ): RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
     override fun handleRequest(apiGatewayProxyRequestEvent: APIGatewayProxyRequestEvent, context: Context): APIGatewayProxyResponseEvent {
@@ -35,6 +34,8 @@ class ApiReactor(
             "/load" -> handleLoad()
             "/iotAccess" -> iotAccess()
             "/notificationEndpoint" -> handleNotificationEndpoint()
+            "/accounts" -> handleAccounts()
+            "/account/{accountId}" -> handleAccount(apiGatewayProxyRequestEvent.pathParameters["accountId"]!!)
             else -> 400 to "NotFound"
         }
         return APIGatewayProxyResponseEvent()
@@ -82,13 +83,32 @@ class ApiReactor(
         }
         return 200 to keys.fold(StringBuilder()){acc, it -> acc.append(it).append("\n")}.toString()
     }
+    fun resourceKeys(): List<String> = s3Client.listObjects(resourceBucket).objectSummaries.map { it.key }
+    fun loadedTypes(keys: List<String>): List<String> =
+        keys.map{ it.substringBefore('/')}.toSet().filter { it != "loading" }
 
     fun handleStatus(): Pair<Int, String>{
-        val keys = s3Client.listObjects(resourceBucket).objectSummaries.map { it.key }
+        val resourceKeys = resourceKeys()
+        val loaded = loadedTypes(resourceKeys)
         fun listString(list: Collection<*>) = list.foldIndexed(StringBuilder()){i, acc, it -> acc.append("\"$it\"").append(if(i<list.size-1){", "}else {""})}.toString()
-        val loaded = keys.map{ it.substringBefore('/')}.toSet().filter { it != "loading" }
         val toLoad = listOf("lambda", "ec2").filter { !loaded.contains(it) }
-        val status = if(toLoad.isEmpty()){"Finished"}else((if(keys.isEmpty()) "Not" else "") + "Started")
+        val status = if(toLoad.isEmpty()){"Finished"}else((if(resourceKeys.isEmpty()) "Not" else "") + "Started")
         return 200 to "{\"status\":\"$status\", \"loaded\":[${listString(loaded)}], \"waitingOn\":[${listString(toLoad)}]}"
+    }
+
+    fun handleAccounts(): Pair<Int, String>{
+        return 200 to "[\"$accountId\"]"
+    }
+
+    fun handleAccount(account: String): Pair<Int, String>{
+        val resources = loadedTypes(resourceKeys())
+        .map { s3Client.getObject(resourceBucket, "$it/info.json").objectContent.bufferedReader().readText() }
+        .flatMap { jsonReader.readValue<List<AwsResource>>(it) }
+        return 200 to jsonWriter.writeValueAsString(resources)
+    }
+
+    companion object {
+        val jsonWriter = jacksonObjectMapper().writerWithDefaultPrettyPrinter()
+        val jsonReader = jacksonObjectMapper().reader()
     }
 }
