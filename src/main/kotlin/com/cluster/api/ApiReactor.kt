@@ -19,6 +19,7 @@ class ApiReactor(
         val payload = String(Base64.decode(token.payload))
         val username = jacksonObjectMapper().readValue<JsonNode>(payload)["cognito:username"].textValue()
         val handler = handlers.find { it.resources.contains(apiGatewayProxyRequestEvent.resource) }
+        println("Resource -> ${apiGatewayProxyRequestEvent.resource}")
         val response = when(handler){
             null -> APIGatewayProxyResponseEvent().withStatusCode(404)
             else -> handler.handle(apiGatewayProxyRequestEvent.resource,username, apiGatewayProxyRequestEvent)
