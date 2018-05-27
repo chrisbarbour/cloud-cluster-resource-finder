@@ -1,4 +1,4 @@
-service: cloud-resource-finder
+service: cloud-cluster
 
 provider:
   name: aws
@@ -7,45 +7,20 @@ provider:
   region: eu-west-1
   iamRoleStatements:
     - Effect: Allow
-      Action: [ 'iot:DescribeEndpoint', 'iot:Connect','iot:Publish' ]
-      Resource: '*'
+      Action: ['cognito-idp:ListUsers']
+      Resource: 'arn:aws:cognito-idp:eu-west-1:432337707074:userpool/eu-west-1_4KfOFr5m3'
     - Effect: Allow
       Action: ['s3:*']
       Resource:
         - Fn::Join:
             - ''
             - - 'arn:aws:s3:::'
-              - Ref: ResourceInfoBucket
+              - Ref: Info
         - Fn::Join:
             - ''
             - - 'arn:aws:s3:::'
-              - Ref: ResourceInfoBucket
+              - Ref: Info
               - '/*'
-    - Effect: Allow
-      Resource: '*'
-      Action:
-        - iam:Get*
-        - iam:List*
-        - kms:ListKeys
-        - sns:List*
-        - sqs:List*
-        - lambda:Get*
-        - lambda:List*
-        - ec2:Describe*
-        - apigateway:GET
-        - s3:List*
-        - rds:Describe*
-        - ecs:Describe*
-        - dynamodb:Describe*
-        - dynamodb:List*
-
-custom:
-  properties:
-    snsEvents:
-      - sns:
-          topicName: CloudClusterInitialLoadTopic
-          arn: { Fn::Join: ['', [ 'arn:aws:sns:', { Ref: 'AWS::Region' }, ':', { Ref: 'AWS::AccountId' }, ':', CloudClusterInitialLoadTopic ] ] }
-
 
 package:
   artifact: target/cloud-resource-finder-1.0-SNAPSHOT.jar
@@ -53,138 +28,24 @@ package:
 functions:
 
   resourceInfoFinder:
-    handler: com.cluster.ApiReactor
+    handler: com.cluster.api.ApiReactor
     environment:
-      BUCKET: { Ref: ResourceInfoBucket }
-      ACCOUNT: { Ref: AWS::AccountId }
-      LOAD_TOPIC: { Ref: InitialLoadTopic }
-      IOT_ROLE_ARN: { Fn::GetAtt: [ 'iotPublicSubscriberRole', 'Arn' ] }
-    role: LambdaFinderRole
+      BUCKET: { Ref: Info }
     events:
       - http:
-          path: status
-          method: get
-          cors: true
-      - http:
-          path: reset
-          method: get
-          cors: true
-      - http:
-          path: load
-          method: get
-          cors: true
-      - http:
-          path: iotAccess
-          method: get
-          cors: true
-      - http:
-          path: notificationEndpoint
-          method: get
-          cors: true
-      - http:
           path: accounts
-          method: get
           cors: true
+          method: get
+          authorizer:
+            arn: arn:aws:cognito-idp:eu-west-1:432337707074:userpool/eu-west-1_4KfOFr5m3
       - http:
           path: accounts/{accountId}
-          method: get
           cors: true
-
-  lamdbaFinder:
-    handler: com.cluster.SnsReactor
-    environment:
-      BUCKET: { Ref: ResourceInfoBucket }
-      ACCOUNT: { Ref: AWS::AccountId }
-      RESOURCE: 'lambda'
-    events: ${self:custom.properties.snsEvents}
-  ec2Finder:
-    handler: com.cluster.SnsReactor
-    environment:
-      BUCKET: { Ref: ResourceInfoBucket }
-      ACCOUNT: { Ref: AWS::AccountId }
-      RESOURCE: 'ec2'
-    events: ${self:custom.properties.snsEvents}
+          method: get
+          authorizer:
+            arn: arn:aws:cognito-idp:eu-west-1:432337707074:userpool/eu-west-1_4KfOFr5m3
 
 resources:
   Resources:
-    ResourceInfoBucket:
+    Info:
       Type: AWS::S3::Bucket
-    InitialLoadTopic:
-      Type: AWS::SNS::Topic
-      Properties:
-        TopicName: 'CloudClusterInitialLoadTopic'
-
-    LambdaFinderRole:
-      Type: AWS::IAM::Role
-      Properties:
-        Path: '/'
-        RoleName: LambdaFinderRole
-        AssumeRolePolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service:
-                  - lambda.amazonaws.com
-              Action: sts:AssumeRole
-        Policies:
-          - PolicyName: myPolicyName
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - logs:CreateLogGroup
-                    - logs:CreateLogStream
-                    - logs:PutLogEvents
-                  Resource:
-                    - 'Fn::Join':
-                      - ':'
-                      - - 'arn:aws:logs'
-                        - Ref: 'AWS::Region'
-                        - Ref: 'AWS::AccountId'
-                        - 'log-group:/aws/lambda/*:*:*'
-                - Effect: Allow
-                  Action: [ 's3:*' ]
-                  Resource:
-                    - Fn::Join:
-                        - ''
-                        - - 'arn:aws:s3:::'
-                          - Ref: ResourceInfoBucket
-                    - Fn::Join:
-                        - ''
-                        - - 'arn:aws:s3:::'
-                          - Ref: ResourceInfoBucket
-                          - '/*'
-                - Effect: Allow
-                  Action: [ 'sns:publish' ]
-                  Resource: { Ref: InitialLoadTopic }
-                - Effect: Allow
-                  Action: [ 'iot:DescribeEndpoint', 'iot:Connect','iot:Publish' ]
-                  Resource: '*'
-                - Effect: Allow
-                  Action: [ 'sts:AssumeRole' ]
-                  Resource: { Fn::GetAtt: [ iotPublicSubscriberRole, 'Arn' ] }
-
-    iotPublicSubscriberRole:
-      Type: AWS::IAM::Role
-      Properties:
-        Path: '/'
-        RoleName: iotPublicSubscriberRole
-        AssumeRolePolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Principal: { AWS: { Fn::Join: ['', ['arn:aws:iam::',{ Ref: 'AWS::AccountId' },':root']]} }
-              Action: sts:AssumeRole
-        Policies:
-          - PolicyName: allowIotAccessPolicy
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - iot:Connect
-                    - iot:Subscribe
-                    - iot:Receive
-                  Resource: '*'
