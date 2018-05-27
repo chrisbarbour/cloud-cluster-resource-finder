@@ -2,7 +2,6 @@ package com.cluster.api
 
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProviderClient
-import com.amazonaws.services.cognitoidp.model.ListUsersRequest
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import com.amazonaws.services.s3.AmazonS3
@@ -28,7 +27,7 @@ class Accounts(
         }
     }
 
-    fun accessInfo(username: String): List<String>{
+    fun accessInfo(username: String): List<Account>{
         val accessKey = "accounts/access.json"
         val accessObjectExists = s3Client.doesObjectExist(infoBucket, accessKey)
         return if(!accessObjectExists){
@@ -41,12 +40,16 @@ class Accounts(
             val accessContent = s3Client.getObjectAsString(infoBucket, accessKey)
             val access = jackson.readValue<Access>(accessContent)
             val allGroups = access.groups
-            access.users
-                .find { it.username == username }?.groups.orEmpty()
+            val allAccounts = access.accounts
+            val user = access.users.find { it.username == username }
+            val groups = user?.groups.orEmpty()
+            val aliases = user?.aliases.orEmpty()
+            groups
                 .mapNotNull{ group -> allGroups.find { it.name == group } }
                 .flatMap { it.accounts }
+                .mapNotNull { account -> allAccounts.find { it.id == account } }
+                .map { account ->  aliases.find { it.id == account.id } ?: account }
         }
-
     }
 
     fun getAccounts(username: String): APIGatewayProxyResponseEvent{
@@ -58,9 +61,10 @@ class Accounts(
 
     fun notHandledResource() = APIGatewayProxyResponseEvent().withStatusCode(404)
 
-    data class Access(val groups: List<Group> = emptyList(), val users: List<User> = emptyList())
-    data class Group(val name: String, val accounts: List<String>)
-    data class User(val username: String, val groups: List<String>)
+    data class Access(val groups: List<Group> = emptyList(), val users: List<User> = emptyList(), val accounts: List<Account> = emptyList())
+    data class Group(val name: String, val accounts: List<String> = emptyList())
+    data class User(val username: String, val groups: List<String> = emptyList(), val aliases: List<Account> = emptyList())
+    data class Account(val id: String, val name: String)
 
     companion object {
         private val jackson = jacksonObjectMapper()
