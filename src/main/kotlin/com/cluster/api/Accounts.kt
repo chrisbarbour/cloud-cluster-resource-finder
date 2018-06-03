@@ -23,7 +23,11 @@ class Accounts(
         println("Method -> ${event.httpMethod}")
         return when(resource){
             "/accounts" -> getAccounts(username)
-            "/accounts/{accountId}" -> if(event.httpMethod.toLowerCase() == "put") putAccount(username, event.pathParameters["accountId"]!!, event.body) else notHandledResource()
+            "/accounts/{accountId}" -> when(event.httpMethod.toUpperCase()){
+                "GET" -> getAccount(username, event.pathParameters["accountId"]!!)
+                "PUT" -> putAccount(username, event.pathParameters["accountId"]!!, event.body)
+                else -> notHandledResource()
+            }
             else -> notHandledResource()
         }
     }
@@ -112,6 +116,30 @@ class Accounts(
                 .withStatusCode(201)
     }
 
+    fun getAccount(username: String, accountId: String): APIGatewayProxyResponseEvent{
+        val accessibleAccounts = accessInfoFor(username, fullAccessInfo())
+        if(accessibleAccounts.find { it.id == accountId } != null){
+           val status = if(s3Client.doesObjectExist(infoBucket, "/accounts/$accountId/status.json")){
+               val payload = s3Client.getObjectAsString(infoBucket, "/accounts/$accountId/status.json")
+               jackson.readValue(payload)
+           }
+           else{
+               val status = AccountStatus()
+               val payload = jackson.writeValueAsBytes(status)
+               val metadata = ObjectMetadata()
+               metadata.contentType = "application/json"
+               s3Client.putObject(infoBucket, "/accounts/$accountId/status.json",ByteArrayInputStream(payload),metadata)
+               status
+           }
+            val responseBody = jackson.writeValueAsString(status)
+            return APIGatewayProxyResponseEvent()
+                    .withHeaders( mapOf("Content-Type" to "application/json"))
+                    .withBody(responseBody)
+                    .withStatusCode(200)
+        }
+        return APIGatewayProxyResponseEvent().withStatusCode(403)
+    }
+
     fun notHandledResource() = APIGatewayProxyResponseEvent().withStatusCode(404)
 
     data class Access(val groups: List<Group> = emptyList(), val users: List<User> = emptyList(), val accounts: List<Account> = emptyList())
@@ -119,6 +147,11 @@ class Accounts(
     data class User(val username: String, val groups: List<String> = emptyList(), val aliases: List<Account> = emptyList())
     data class Account(val id: String, val name: String)
     data class AccountNameOnly(val name: String)
+
+    data class AccountStatus(val initialized: Boolean = false,
+                             val isLoading: Boolean = false,
+                             val loaded: List<String> = emptyList(),
+                             val loading: List<String> = emptyList())
     companion object {
         private val jackson = jacksonObjectMapper()
     }

@@ -41,6 +41,12 @@ functions:
       - http:
           path: accounts/{accountId}
           cors: true
+          method: get
+          authorizer:
+            arn: arn:aws:cognito-idp:eu-west-1:432337707074:userpool/eu-west-1_4KfOFr5m3
+      - http:
+          path: accounts/{accountId}
+          cors: true
           method: put
           authorizer:
             arn: arn:aws:cognito-idp:eu-west-1:432337707074:userpool/eu-west-1_4KfOFr5m3
