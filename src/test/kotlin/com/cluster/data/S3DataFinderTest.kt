@@ -28,7 +28,7 @@ class S3DataFinderTest {
     @Test
     fun `should return user in s3 when user exists in bucket`(){
         val username = "Testy"
-        val expectedUser = Account.User(username, listOf(Account.Alias(Account("abcdef123"), name = "Sandbox")))
+        val expectedUser = Account.User(username, listOf(Account.Alias("abcdef123", name = "Sandbox")))
         val key = "users/$username/info.json"
         val userAsString = jacksonObjectMapper().writeValueAsString(expectedUser)
         Mockito.`when`(s3Client.doesObjectExist(testBucket, key)).thenReturn(true)

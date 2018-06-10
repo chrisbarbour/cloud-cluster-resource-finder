@@ -16,6 +16,8 @@ class S3DataFinder(
     override fun userInfoFor(username: String): Account.User = find(infoKeyForUser(username), orCreate = Account.User(username))
     override fun accountInfoFor(accountId: String): Account = find(infoKeyForAccount(accountId), orCreate = Account(accountId))
 
+    override fun updateUserInfo(user: Account.User) { s3Client.putObject(s3Bucket, infoKeyForUser(user.username), jackson.writeValueAsString(user))}
+
     private inline fun <reified T: Any> find(key: String, orCreate: T): T{
         return if(!s3Client.doesObjectExist(s3Bucket, key)){
             val defaultAsString = jackson.writeValueAsString(orCreate)

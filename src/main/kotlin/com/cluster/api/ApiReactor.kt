@@ -11,7 +11,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 
 class ApiReactor(
-        private val apis: List<ApiGatewayHandler> = listOf(UserHandler())
+        private val apis: List<ApiGatewayHandler> = listOf(UserHandler(), AccountHandler())
 ): RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
 
     override fun handleRequest(apiGatewayProxyRequestEvent: APIGatewayProxyRequestEvent, context: Context?): APIGatewayProxyResponseEvent {

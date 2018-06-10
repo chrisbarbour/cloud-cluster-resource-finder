@@ -15,7 +15,13 @@ class UserHandler(val dataFinder: DataFinder = S3DataFinder()): ApiReactor.ApiGa
         val requestedUsername = event.payload.pathParameters[USERNAME]!!
         return if(requestedUsername == event.username) {
             val user = dataFinder.userInfoFor(requestedUsername)
-            val userAsString = jackson.writeValueAsString(user)
+            val userAliasInfo = Account.UserAliasInfo(requestedUsername,
+                user.accountAliases.map {
+                    val realAccount = dataFinder.accountInfoFor(it.accountId)
+                    Account.AliasInfo(it, realAccount.initialized, realAccount.loading, realAccount.accessLevelFor(requestedUsername))
+                }
+            )
+            val userAsString = jackson.writeValueAsString(userAliasInfo)
             APIGatewayProxyResponseEvent()
                     .withStatusCode(200)
                     .withBody(userAsString)
@@ -24,6 +30,8 @@ class UserHandler(val dataFinder: DataFinder = S3DataFinder()): ApiReactor.ApiGa
                 .withStatusCode(403)
                 .withBody("The requested username must match the requesting username")
     }
+
+
 
     companion object {
         private val USERNAME = "username"
