@@ -11,25 +11,26 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 
 class ApiReactor(
-        private val handlers: List<ApiHandler> = listOf(Accounts())
+        private val apis: List<ApiGatewayHandler> = listOf(UserHandler())
 ): RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
 
     override fun handleRequest(apiGatewayProxyRequestEvent: APIGatewayProxyRequestEvent, context: Context?): APIGatewayProxyResponseEvent {
         val token = JWT.decode(apiGatewayProxyRequestEvent.headers["Authorization"]!!.substring("Bearer ".length))
         val payload = String(Base64.decode(token.payload))
         val username = jacksonObjectMapper().readValue<JsonNode>(payload)["cognito:username"].textValue()
-        val handler = handlers.find { it.resources.contains(apiGatewayProxyRequestEvent.resource) }
-        println("Resource -> ${apiGatewayProxyRequestEvent.resource}")
+        val resourceHandler = apis.find { it.resources().containsKey(apiGatewayProxyRequestEvent.resource) }?.resources().orEmpty()[apiGatewayProxyRequestEvent.resource]
+        val handler = resourceHandler.orEmpty()[apiGatewayProxyRequestEvent.httpMethod.toUpperCase()]
         val response = when(handler){
             null -> APIGatewayProxyResponseEvent().withStatusCode(404)
-            else -> handler.handle(apiGatewayProxyRequestEvent.resource,username, apiGatewayProxyRequestEvent)
+            else -> handler(AuthorizedEvent(username, apiGatewayProxyRequestEvent))
         }
         return response.withHeaders(response.headers.orEmpty() + mapOf(
                 "Access-Control-Allow-Origin" to "*"
         ))
     }
-    interface ApiHandler{
-        val resources: List<String>
-        fun handle(resource: String, username: String, event: APIGatewayProxyRequestEvent): APIGatewayProxyResponseEvent
-    }
+    interface ApiGatewayHandler: Api<AuthorizedEvent, APIGatewayProxyResponseEvent>
+    open class AuthorizedEvent(val username: String, event: APIGatewayProxyRequestEvent): Event<APIGatewayProxyRequestEvent>(event)
+    interface Api<in T: Event<*>, out R>{ fun resources(): Map<String, Map<String, (event: T) -> R>> }
+    open class Event<out T>(val payload: T)
+
 }
