@@ -77,7 +77,7 @@ functions:
       - http:
           path: /users/{username}
           cors: true
-          method: put
+          method: get
           authorizer:
             arn: arn:aws:cognito-idp:eu-west-1:432337707074:userpool/eu-west-1_4KfOFr5m3
 resources:
