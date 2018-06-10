@@ -10,6 +10,16 @@ provider:
       Action: ['cognito-idp:ListUsers']
       Resource: 'arn:aws:cognito-idp:eu-west-1:432337707074:userpool/eu-west-1_4KfOFr5m3'
     - Effect: Allow
+      Action: ['sns:Publish*']
+      Resource:
+        - Ref: LoadTopic
+    - Effect: Allow
+      Action: ['kms:Encrypt**']
+      Resource:
+        - Fn::GetAtt:
+            - EncryptionKey
+            - Arn
+    - Effect: Allow
       Action: ['s3:*']
       Resource:
         - Fn::Join:
@@ -27,31 +37,113 @@ package:
 
 functions:
 
+  resourceLoader:
+    handler: com.cluster.sns.Loader
+    role: LoaderRole
+    timeout: 30
+    environment:
+      BUCKET: { Ref: Info }
+    events:
+      - sns:
+          arn:
+            Fn::Join:
+              - ""
+              - - "arn:aws:sns:"
+                - Ref: "AWS::Region"
+                - ":"
+                - Ref: "AWS::AccountId"
+                - ":LoaderTopic"
+          topicName: LoaderTopic
+
   resourceInfoFinder:
     handler: com.cluster.api.ApiReactor
     environment:
       BUCKET: { Ref: Info }
+      KEY: { Ref: EncryptionKey }
+      LOAD_TOPIC: { Ref: LoadTopic }
     events:
       - http:
-          path: accounts
-          cors: true
-          method: get
-          authorizer:
-            arn: arn:aws:cognito-idp:eu-west-1:432337707074:userpool/eu-west-1_4KfOFr5m3
-      - http:
-          path: accounts/{accountId}
-          cors: true
-          method: get
-          authorizer:
-            arn: arn:aws:cognito-idp:eu-west-1:432337707074:userpool/eu-west-1_4KfOFr5m3
-      - http:
-          path: accounts/{accountId}
+          path: /accounts/{accountId}/alias/{alias}
           cors: true
           method: put
           authorizer:
             arn: arn:aws:cognito-idp:eu-west-1:432337707074:userpool/eu-west-1_4KfOFr5m3
-
+      - http:
+          path: /accounts/{accountId}/alias/{alias}
+          cors: true
+          method: delete
+          authorizer:
+            arn: arn:aws:cognito-idp:eu-west-1:432337707074:userpool/eu-west-1_4KfOFr5m3
+      - http:
+          path: /users/{username}
+          cors: true
+          method: put
+          authorizer:
+            arn: arn:aws:cognito-idp:eu-west-1:432337707074:userpool/eu-west-1_4KfOFr5m3
 resources:
   Resources:
     Info:
       Type: AWS::S3::Bucket
+    EncryptionKey:
+      Type: AWS::KMS::Key
+      Properties:
+        KeyPolicy: {"Version": "2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"*","Resource":"*"}]}
+    LoadTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: LoaderTopic
+
+
+    LoaderRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: /
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: loaderPolicy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource:
+                    - 'Fn::Join':
+                      - ':'
+                      -
+                        - 'arn:aws:logs'
+                        - Ref: 'AWS::Region'
+                        - Ref: 'AWS::AccountId'
+                        - 'log-group:/aws/lambda/*:*:*'
+                - Effect: Allow
+                  Action: ['sns:Subscribe*']
+                  Resource:
+                    - Ref: LoadTopic
+                - Effect: Allow
+                  Action:
+                    - kms:Decrypt*
+                  Resource:
+                    Fn::GetAtt:
+                      - EncryptionKey
+                      - Arn
+                - Effect: Allow
+                  Action: ['s3:*']
+                  Resource:
+                    - Fn::Join:
+                        - ''
+                        - - 'arn:aws:s3:::'
+                          - Ref: Info
+                    - Fn::Join:
+                        - ''
+                        - - 'arn:aws:s3:::'
+                          - Ref: Info
+                          - '/*'
