@@ -6,6 +6,8 @@ data class Account(val id: String, val initialized: Boolean = false, val loading
     data class Alias(val accountId: String, val name: String)
     data class User(val username: String, val accountAliases: List<Alias> = emptyList())
 
+    data class AwsAuth(val awsAccessKeyId: String, val awsSecretAccessKey: String, val awsSessionToken: String? = null)
+
     data class AliasInfo(val alias: Alias, val initialized: Boolean, val loading: Boolean, val accessLevel: AccessLevel = AccessLevel.NONE)
     data class UserAliasInfo(val username: String, val accountAliases: List<AliasInfo> = emptyList())
 
