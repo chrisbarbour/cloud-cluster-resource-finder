@@ -31,18 +31,8 @@ provider:
             - - 'arn:aws:s3:::'
               - Ref: Info
               - '/*'
-
-package:
-  artifact: target/cloud-resource-finder-1.0-SNAPSHOT.jar
-
-functions:
-
-  resourceLoader:
-    handler: com.cluster.sns.Loader
-    role: LoaderRole
-    timeout: 30
-    environment:
-      BUCKET: { Ref: Info }
+custom:
+  properties:
     events:
       - sns:
           arn:
@@ -54,6 +44,19 @@ functions:
                 - Ref: "AWS::AccountId"
                 - ":LoaderTopic"
           topicName: LoaderTopic
+
+package:
+  artifact: target/cloud-resource-finder-1.0-SNAPSHOT.jar
+
+functions:
+
+  resourceLoader:
+    handler: com.cluster.sns.Ec2Loader
+    role: LoaderRole
+    timeout: 300
+    environment:
+      BUCKET: { Ref: Info }
+    events: ${self:custom.properties.events}
 
   resourceInfoFinder:
     handler: com.cluster.api.ApiReactor

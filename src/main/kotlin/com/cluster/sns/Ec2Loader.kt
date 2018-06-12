@@ -13,7 +13,7 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
 
-class Loader(private val kmsClient: AWSKMS = AwsConfigurator.defaultClient(AWSKMSClient.builder()))
+class Ec2Loader(private val kmsClient: AWSKMS = AwsConfigurator.defaultClient(AWSKMSClient.builder()))
     : RequestHandler<SNSEvent, String>{
 
     override fun handleRequest(event: SNSEvent, context: Context?): String {
