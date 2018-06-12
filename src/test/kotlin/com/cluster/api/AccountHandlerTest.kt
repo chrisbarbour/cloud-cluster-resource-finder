@@ -13,7 +13,7 @@ import kotlin.test.expect
 class AccountHandlerTest{
 
     private val dataFinder: DataFinder = mock()
-    private val accountHandler = AccountHandler(dataFinder, "", mock())
+    private val accountHandler = AccountHandler(dataFinder, "", mock(),mock(),mock())
     @Test
     fun `should append alias when adding account alias`(){
         val username = "bob"

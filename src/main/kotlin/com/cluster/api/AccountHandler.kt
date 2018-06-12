@@ -1,7 +1,12 @@
 package com.cluster.api
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
+import com.amazonaws.services.sns.AmazonSNS
+import com.amazonaws.services.sns.AmazonSNSClient
+import com.amazonaws.services.sns.model.PublishRequest
 import com.cluster.AccessChecker
+import com.cluster.AwsConfigurator
+import com.cluster.KmsClient
 import com.cluster.data.DataFinder
 import com.cluster.data.S3DataFinder
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -10,7 +15,9 @@ import com.fasterxml.jackson.module.kotlin.readValue
 class AccountHandler(
         private val dataFinder: DataFinder = S3DataFinder(),
         private val loadTopic: String = System.getenv("LOAD_TOPIC"),
-        private val accessChecker: AccessChecker = AccessChecker()
+        private val accessChecker: AccessChecker = AccessChecker(),
+        private val kmsClient: KmsClient = KmsClient(),
+        private val snsClient: AmazonSNS = AwsConfigurator.defaultClient(AmazonSNSClient.builder())
 ): ApiReactor.ApiGatewayHandler {
 
     override fun resources() = mapOf(
@@ -41,12 +48,16 @@ class AccountHandler(
     fun load(event: ApiReactor.AuthorizedEvent): APIGatewayProxyResponseEvent{
         val creds: Account.AwsAuth = jackson.readValue(event.payload.body)
         val hasAccess = verifyAccess(event.payload.pathParameters[ACCOUNT_ID]!!, creds)
-        return if(hasAccess) APIGatewayProxyResponseEvent().withBody("User has Access!").withStatusCode(200)
+        return if(hasAccess){
+            val encryptedCreds = kmsClient.encrypt(event.payload.body)
+            snsClient.publish(PublishRequest().withTopicArn(loadTopic).withMessage(encryptedCreds))
+            APIGatewayProxyResponseEvent().withBody("User has Access, Loading").withStatusCode(200)
+        }
         else APIGatewayProxyResponseEvent().withStatusCode(403)
     }
 
     fun verifyAccess(accountId: String, credentials: Account.AwsAuth): Boolean{
-        return accessChecker.userHasAccess(accountId, credentials)
+        return credentials.awsAccessKeyId.isNotEmpty() && accessChecker.userHasAccess(accountId, credentials)
     }
 
     companion object {

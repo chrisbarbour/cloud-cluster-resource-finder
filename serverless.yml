@@ -62,7 +62,7 @@ functions:
     handler: com.cluster.api.ApiReactor
     environment:
       BUCKET: { Ref: Info }
-      KEY: { Ref: EncryptionKey }
+      ENCRYPTION_KEY: { Ref: EncryptionKey }
       LOAD_TOPIC: { Ref: LoadTopic }
     events:
       - http:
@@ -75,6 +75,12 @@ functions:
           path: /accounts/{accountId}/alias/{alias}
           cors: true
           method: delete
+          authorizer:
+            arn: arn:aws:cognito-idp:eu-west-1:432337707074:userpool/eu-west-1_4KfOFr5m3
+      - http:
+          path: /accounts/{accountId}/load
+          cors: true
+          method: post
           authorizer:
             arn: arn:aws:cognito-idp:eu-west-1:432337707074:userpool/eu-west-1_4KfOFr5m3
       - http:
