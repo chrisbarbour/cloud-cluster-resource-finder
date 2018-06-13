@@ -22,7 +22,7 @@ class S3DataFinderTest {
         val expectedUser = Account.User(username)
         val userAsString = jacksonObjectMapper().writeValueAsString(expectedUser)
         expect(expectedUser){ dataFinder.userInfoFor(username) }
-        Mockito.verify(s3Client).putObject(testBucket, key, userAsString)
+        //Mockito.verify(s3Client).putObject(testBucket, key, userAsString)
     }
 
     @Test
