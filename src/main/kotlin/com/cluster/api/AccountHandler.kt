@@ -47,9 +47,11 @@ class AccountHandler(
 
     fun load(event: ApiReactor.AuthorizedEvent): APIGatewayProxyResponseEvent{
         val creds: Account.AwsAuth = jackson.readValue(event.payload.body)
-        val hasAccess = verifyAccess(event.payload.pathParameters[ACCOUNT_ID]!!, creds)
+        val accountId = event.payload.pathParameters[ACCOUNT_ID]!!
+        val hasAccess = verifyAccess(accountId, creds)
         return if(hasAccess){
-            val encryptedCreds = kmsClient.encrypt(event.payload.body)
+            val request = Account.ResourceLoaderRequest(accountId, "lambda", creds)
+            val encryptedCreds = kmsClient.encrypt(jackson.writeValueAsString(request))
             snsClient.publish(PublishRequest().withTopicArn(loadTopic).withMessage(encryptedCreds))
             APIGatewayProxyResponseEvent().withBody("User has Access, Loading").withStatusCode(200)
         }

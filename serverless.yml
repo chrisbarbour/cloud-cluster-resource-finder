@@ -51,7 +51,7 @@ package:
 functions:
 
   resourceLoader:
-    handler: com.cluster.sns.Ec2Loader
+    handler: com.cluster.sns.ResourceLoader
     role: LoaderRole
     timeout: 300
     environment:
