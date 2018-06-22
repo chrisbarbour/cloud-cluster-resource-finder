@@ -4,6 +4,9 @@ import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.AmazonS3Client
 import com.amazonaws.services.s3.model.ObjectMetadata
 import com.cluster.AwsConfigurator
+import com.cluster.AwsResource
+import com.cluster.Node
+import com.cluster.NodeBuilder
 import com.cluster.api.Account
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -20,16 +23,27 @@ class S3DataFinder(
 
     override fun updateUserInfo(user: Account.User) { s3Client.putObject(s3Bucket, infoKeyForUser(user.username), jackson.writeValueAsString(user))}
 
-    override fun updateAccountInfoFor(accountId: String, resource: String, info: Any) {
+    override fun updateAccountInfoFor(accountId: String, resource: String, username: String, info: Any) {
         s3Client.putObject(s3Bucket, keyForAccount(accountId) + "$resource/info.json", jackson.writeValueAsString(info).asStream(),jsonMeta())
         val keys = s3Client.listObjects(s3Bucket, keyForAccount(accountId)).objectSummaries.map { it.key.substring(keyForAccount(accountId).length).substringBefore("/info.json") }
-        println("keys: " + keys)
         val currentAccountInfo = accountInfoFor(accountId)
         if(keys.contains("lambda")){
-            val newInfo = currentAccountInfo.copy(initialized = true, loading = false)
+            val newMeta = (currentAccountInfo.info ?: Account.Meta()).let { it.copy(admins = it.admins + username) }
+            val newInfo = currentAccountInfo.copy(initialized = true, loading = false,info = newMeta)
             s3Client.putObject(s3Bucket, infoKeyForAccount(accountId), jackson.writeValueAsString(newInfo).asStream(),jsonMeta())
+            combineResources(accountId)
         }
     }
+
+    fun combineResources(accountId: String){
+        val resources = listOf("lambda").flatMap {
+            jackson.readValue<List<AwsResource.Relationships>>(s3Client.getObjectAsString(s3Bucket, keyForAccount(accountId) + "$it/info.json"))
+        }
+        val nodeTree = NodeBuilder.buildFrom(resources)
+        s3Client.putObject(s3Bucket, nodeKeyForAccount(accountId), jackson.writeValueAsString(nodeTree).asStream(), jsonMeta())
+    }
+
+    override fun accountTreeFor(accountId: String) = s3Client.getObjectAsString(s3Bucket, nodeKeyForAccount(accountId))
 
     private fun String.asStream() = ByteArrayInputStream(this.toByteArray())
 
@@ -49,10 +63,7 @@ class S3DataFinder(
         private fun keyForAccount(accountId: String) = "accounts/$accountId/"
         private fun infoKeyForUser(username: String) = keyForUser(username) + infoJson
         private fun infoKeyForAccount(accountId: String) = keyForAccount(accountId) + infoJson
-        private fun jsonMeta(): ObjectMetadata{
-            val meta = ObjectMetadata()
-            meta.contentType = "application/json"
-            return meta
-        }
+        private fun nodeKeyForAccount(accountId: String) = keyForAccount(accountId) + "nodeTree.json"
+        private fun jsonMeta() = ObjectMetadata().also { it.contentType = "application/json" }
     }
 }

@@ -23,7 +23,7 @@ class ResourceLoader(
             val authString = kmsClient.decrypt(event.records[0].sns.message)
             val request = jackson.readValue<Account.ResourceLoaderRequest>(authString)
             val resources = resourcesIn("eu-west-1", request.resource, request.accountId, request.credentials)
-            dataFinder.updateAccountInfoFor(request.accountId, request.resource, resources)
+            dataFinder.updateAccountInfoFor(request.accountId, request.resource, request.username, resources)
         }
         catch(e: Exception){
             System.err.println("Error, cannot show in case it is sensitive")
