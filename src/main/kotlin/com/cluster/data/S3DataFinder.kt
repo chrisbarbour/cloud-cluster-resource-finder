@@ -8,6 +8,7 @@ import com.cluster.AwsResource
 import com.cluster.Node
 import com.cluster.NodeBuilder
 import com.cluster.api.Account
+import com.cluster.api.AccountHandler
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import java.io.ByteArrayInputStream
@@ -27,7 +28,7 @@ class S3DataFinder(
         s3Client.putObject(s3Bucket, keyForAccount(accountId) + "$resource/info.json", jackson.writeValueAsString(info).asStream(),jsonMeta())
         val keys = s3Client.listObjects(s3Bucket, keyForAccount(accountId)).objectSummaries.map { it.key.substring(keyForAccount(accountId).length).substringBefore("/info.json") }
         val currentAccountInfo = accountInfoFor(accountId)
-        if(keys.contains("lambda")){
+        if(keys.containsAll(AccountHandler.resources)){
             val newMeta = (currentAccountInfo.info ?: Account.Meta()).let { it.copy(admins = it.admins + username) }
             val newInfo = currentAccountInfo.copy(initialized = true, loading = false,info = newMeta)
             s3Client.putObject(s3Bucket, infoKeyForAccount(accountId), jackson.writeValueAsString(newInfo).asStream(),jsonMeta())
@@ -36,7 +37,7 @@ class S3DataFinder(
     }
 
     fun combineResources(accountId: String){
-        val resources = listOf("lambda").flatMap {
+        val resources =AccountHandler.resources.flatMap {
             jackson.readValue<List<AwsResource.Relationships>>(s3Client.getObjectAsString(s3Bucket, keyForAccount(accountId) + "$it/info.json"))
         }
         val nodeTree = NodeBuilder.buildFrom(resources)

@@ -51,10 +51,12 @@ class AccountHandler(
         val accountId = event.payload.pathParameters[ACCOUNT_ID]!!
         val hasAccess = verifyAccess(accountId, creds)
         return if(hasAccess){
-            val request = Account.ResourceLoaderRequest(accountId, "lambda", event.username, creds)
-            val encryptedCreds = kmsClient.encrypt(jackson.writeValueAsString(request))
-            snsClient.publish(PublishRequest().withTopicArn(loadTopic).withMessage(encryptedCreds))
-            APIGatewayProxyResponseEvent().withBody("User has Access, Loading").withStatusCode(200)
+            resources.forEach {
+                val request = Account.ResourceLoaderRequest(accountId, it, event.username, creds)
+                val encryptedCreds = kmsClient.encrypt(jackson.writeValueAsString(request))
+                snsClient.publish(PublishRequest().withTopicArn(loadTopic).withMessage(encryptedCreds))
+            }
+            APIGatewayProxyResponseEvent().withBody("User has Access, Loading resources: $resources").withStatusCode(200)
         }
         else APIGatewayProxyResponseEvent().withStatusCode(403)
     }
@@ -69,7 +71,7 @@ class AccountHandler(
         val accessLevel = accountInfo.accessLevelFor(event.username)
         if(accessLevel == Account.AccessLevel.VIEW || accessLevel == Account.AccessLevel.ADMIN){
             if(accountInfo.initialized && !accountInfo.loading){
-                return APIGatewayProxyResponseEvent().withStatusCode(200).withBody(dataFinder.accountTreeFor(accountId).toString())
+                return APIGatewayProxyResponseEvent().withStatusCode(200).withBody(dataFinder.accountTreeFor(accountId))
             }
             else{
                 return APIGatewayProxyResponseEvent().withStatusCode(400)
@@ -79,6 +81,7 @@ class AccountHandler(
     }
 
     companion object {
+        val resources = listOf("lambda", "iam")
         private const val ACCOUNT_ID = "accountId"
         private const val ALIAS = "alias"
         private val jackson = jacksonObjectMapper()

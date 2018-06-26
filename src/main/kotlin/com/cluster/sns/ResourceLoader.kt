@@ -1,7 +1,11 @@
 package com.cluster.sns
 
+import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.auth.AWSStaticCredentialsProvider
 import com.amazonaws.auth.BasicAWSCredentials
+import com.amazonaws.client.builder.AwsClientBuilder
+import com.amazonaws.client.builder.AwsSyncClientBuilder
+import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClient
 import com.amazonaws.services.lambda.AWSLambdaClient
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestHandler
@@ -41,6 +45,7 @@ fun resourcesIn(region: String, loader: String, accountId: String, credentials: 
     val creds = AWSStaticCredentialsProvider(BasicAWSCredentials(credentials.awsAccessKeyId, credentials.awsSecretAccessKey))
     val finder: AwsResource.Finder = when(loader){
         "lambda" -> AwsResourceFinderLambda{ currentRegion -> AWSLambdaClient.builder().withCredentials(creds).withRegion(currentRegion).build() }
+        "iam" -> AwsResourceFinderIAM{ currentRegion -> AmazonIdentityManagementClient.builder().withCredentials(creds).withRegion(currentRegion).build() }
         else -> throw IllegalArgumentException()
     }
     return finder.findIn(accountId, listOf(region))
