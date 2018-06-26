@@ -81,7 +81,7 @@ class AccountHandler(
     }
 
     companion object {
-        val resources = listOf("lambda", "iam")
+        val resources = listOf("lambda", "iam", "sns")
         private const val ACCOUNT_ID = "accountId"
         private const val ALIAS = "alias"
         private val jackson = jacksonObjectMapper()
