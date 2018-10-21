@@ -1,19 +1,28 @@
 package com.cluster.api
 
-import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import com.cluster.data.DataFinder
 import com.cluster.data.S3DataFinder
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import org.http4k.core.*
+import org.http4k.core.Status.Companion.OK
+import org.http4k.format.Jackson
+import org.http4k.routing.bind
+import org.http4k.routing.path
+import org.http4k.routing.routes
+import org.http4k.serverless.AppLoader
 
-class UserHandler(val dataFinder: DataFinder = S3DataFinder()): ApiReactor.ApiGatewayHandler {
+class UserHandler(private val dataFinder: DataFinder = S3DataFinder()): AppLoader {
 
-    override fun resources() = mapOf(
-            "/users/{$USERNAME}" to mapOf("GET" to ::user)
+    override fun invoke(environment: Map<String, String>) = routes(
+            "/users/{username}" bind routes(
+                    "/" bind Method.GET to authenticated(::user),
+                    optionsRoute
+            )
     )
 
-    fun user(event: ApiReactor.AuthorizedEvent): APIGatewayProxyResponseEvent {
-        val requestedUsername = event.payload.pathParameters[USERNAME]!!
-        return if(requestedUsername == event.username) {
+    fun user(contexts: RequestContexts) = { request: Request ->
+        val username = contexts[request].get<String>("username")!!
+        val requestedUsername = usernameFrom(request)
+        if(requestedUsername == username) {
             val user = dataFinder.userInfoFor(requestedUsername)
             val userAliasInfo = Account.UserAliasInfo(requestedUsername,
                 user.accountAliases.map {
@@ -21,20 +30,15 @@ class UserHandler(val dataFinder: DataFinder = S3DataFinder()): ApiReactor.ApiGa
                     Account.AliasInfo(it, realAccount.initialized, realAccount.loading, realAccount.accessLevelFor(requestedUsername))
                 }
             )
-            val userAsString = jackson.writeValueAsString(userAliasInfo)
-            APIGatewayProxyResponseEvent()
-                    .withStatusCode(200)
-                    .withBody(userAsString)
+            Response(OK).body(Jackson.asJsonString(userAliasInfo))
         }
-        else APIGatewayProxyResponseEvent()
-                .withStatusCode(403)
-                .withBody("The requested username must match the requesting username")
+        else Response(Status.FORBIDDEN)
+                .body("The requested username must match the requesting username")
     }
 
 
 
     companion object {
-        private val USERNAME = "username"
-        private val jackson = jacksonObjectMapper()
+        private fun usernameFrom(request: Request) = request.path("username")
     }
 }
