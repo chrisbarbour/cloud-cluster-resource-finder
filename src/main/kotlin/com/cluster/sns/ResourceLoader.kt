@@ -4,22 +4,18 @@ import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.auth.AWSStaticCredentialsProvider
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.client.builder.AwsClientBuilder
-import com.amazonaws.client.builder.AwsSyncClientBuilder
 import com.amazonaws.services.apigateway.AmazonApiGatewayClient
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient
 import com.amazonaws.services.ec2.AmazonEC2Client
 import com.amazonaws.services.ecs.AmazonECSClient
 import com.amazonaws.services.identitymanagement.AmazonIdentityManagementClient
 import com.amazonaws.services.kms.AWSKMSClient
-import com.amazonaws.services.kms.AWSKMSClientBuilder
 import com.amazonaws.services.lambda.AWSLambdaClient
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestHandler
 import com.amazonaws.services.lambda.runtime.events.SNSEvent
 import com.amazonaws.services.s3.AmazonS3Client
-import com.amazonaws.services.sns.AmazonSNS
 import com.amazonaws.services.sns.AmazonSNSClient
-import com.amazonaws.services.sns.AmazonSNSClientBuilder
 import com.amazonaws.services.sqs.AmazonSQSClient
 import com.cluster.*
 import com.cluster.api.Account
@@ -37,11 +33,11 @@ class ResourceLoader(
         try {
             val authString = kmsClient.decrypt(event.records[0].sns.message)
             val request = jackson.readValue<Account.ResourceLoaderRequest>(authString)
-            val resources = resourcesIn("eu-west-1", request.resource, request.accountId, request.credentials)
+            val resources = resourcesIn(request.region, request.resource, request.accountId, request.credentials)
             dataFinder.updateAccountInfoFor(request.accountId, request.resource, request.username, resources)
         }
         catch(e: Exception){
-            System.err.println("Error, cannot show in case it is sensitive")
+            e.printStackTrace()
         }
         return "Done"
     }

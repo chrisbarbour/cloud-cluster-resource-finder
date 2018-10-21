@@ -11,44 +11,44 @@ import org.mockito.internal.verification.VerificationModeFactory
 import kotlin.test.expect
 
 class AccountHandlerTest{
-
-    private val dataFinder: DataFinder = mock()
-    private val accountHandler = AccountHandler(dataFinder, "", mock(),mock(),mock())
-    @Test
-    fun `should append alias when adding account alias`(){
-        val username = "bob"
-        val addedAlias =  Account.Alias("5432", "Non Prod")
-        val userBefore = Account.User(username, listOf(Account.Alias("1234", "Sandbox")))
-        val userAfter = Account.User(username, listOf(Account.Alias("1234", "Sandbox"), addedAlias))
-        val event = ApiReactor.AuthorizedEvent(username, APIGatewayProxyRequestEvent().withPathParamters(mapOf("accountId" to addedAlias.accountId, "alias" to addedAlias.name )))
-        Mockito.`when`(dataFinder.userInfoFor(username)).thenReturn(userBefore)
-        expect(userAfter){ jacksonObjectMapper().readValue(accountHandler.addAlias(event).body) }
-        Mockito.verify(dataFinder).updateUserInfo(userAfter)
-    }
-
-    @Test
-    fun `should not append alias when adding account alias and id already has alias`(){
-        val username = "bob"
-        val addedAlias =  Account.Alias("1234", "Non Prod")
-        val userBefore = Account.User(username, listOf(Account.Alias("1234", "Sandbox")))
-        val userAfter = Account.User(username, listOf(Account.Alias("1234", "Sandbox")))
-        val event = ApiReactor.AuthorizedEvent(username, APIGatewayProxyRequestEvent().withPathParamters(mapOf("accountId" to addedAlias.accountId, "alias" to addedAlias.name )))
-        Mockito.`when`(dataFinder.userInfoFor(username)).thenReturn(userBefore)
-        expect(userAfter){ jacksonObjectMapper().readValue(accountHandler.addAlias(event).body) }
-        Mockito.verify(dataFinder,VerificationModeFactory.times(0)).updateUserInfo(userAfter)
-    }
-
-    @Test
-    fun `should remove alias when deleting account alias`(){
-        val username = "bob"
-        val removedAlias =  Account.Alias("5432", "Non Prod")
-        val userBefore = Account.User(username, listOf(Account.Alias("1234", "Sandbox"), removedAlias))
-        val userAfter = Account.User(username, listOf(Account.Alias("1234", "Sandbox")))
-        val event = ApiReactor.AuthorizedEvent(username, APIGatewayProxyRequestEvent().withPathParamters(mapOf("accountId" to removedAlias.accountId, "alias" to removedAlias.name )))
-        Mockito.`when`(dataFinder.userInfoFor(username)).thenReturn(userBefore)
-        expect(userAfter){ jacksonObjectMapper().readValue(accountHandler.deleteAlias(event).body) }
-        Mockito.verify(dataFinder).updateUserInfo(userAfter)
-
-    }
+//
+//    private val dataFinder: DataFinder = mock()
+//    private val accountHandler = AccountHandler(dataFinder, "", mock(),mock(),mock())
+//    @Test
+//    fun `should append alias when adding account alias`(){
+//        val username = "bob"
+//        val addedAlias =  Account.Alias("5432", "Non Prod")
+//        val userBefore = Account.User(username, listOf(Account.Alias("1234", "Sandbox")))
+//        val userAfter = Account.User(username, listOf(Account.Alias("1234", "Sandbox"), addedAlias))
+//        val event = ApiReactor.AuthorizedEvent(username, APIGatewayProxyRequestEvent().withPathParamters(mapOf("accountId" to addedAlias.accountId, "alias" to addedAlias.name )))
+//        Mockito.`when`(dataFinder.userInfoFor(username)).thenReturn(userBefore)
+//        expect(userAfter){ jacksonObjectMapper().readValue(accountHandler.addAlias(event).body) }
+//        Mockito.verify(dataFinder).updateUserInfo(userAfter)
+//    }
+//
+//    @Test
+//    fun `should not append alias when adding account alias and id already has alias`(){
+//        val username = "bob"
+//        val addedAlias =  Account.Alias("1234", "Non Prod")
+//        val userBefore = Account.User(username, listOf(Account.Alias("1234", "Sandbox")))
+//        val userAfter = Account.User(username, listOf(Account.Alias("1234", "Sandbox")))
+//        val event = ApiReactor.AuthorizedEvent(username, APIGatewayProxyRequestEvent().withPathParamters(mapOf("accountId" to addedAlias.accountId, "alias" to addedAlias.name )))
+//        Mockito.`when`(dataFinder.userInfoFor(username)).thenReturn(userBefore)
+//        expect(userAfter){ jacksonObjectMapper().readValue(accountHandler.addAlias(event).body) }
+//        Mockito.verify(dataFinder,VerificationModeFactory.times(0)).updateUserInfo(userAfter)
+//    }
+//
+//    @Test
+//    fun `should remove alias when deleting account alias`(){
+//        val username = "bob"
+//        val removedAlias =  Account.Alias("5432", "Non Prod")
+//        val userBefore = Account.User(username, listOf(Account.Alias("1234", "Sandbox"), removedAlias))
+//        val userAfter = Account.User(username, listOf(Account.Alias("1234", "Sandbox")))
+//        val event = ApiReactor.AuthorizedEvent(username, APIGatewayProxyRequestEvent().withPathParamters(mapOf("accountId" to removedAlias.accountId, "alias" to removedAlias.name )))
+//        Mockito.`when`(dataFinder.userInfoFor(username)).thenReturn(userBefore)
+//        expect(userAfter){ jacksonObjectMapper().readValue(accountHandler.deleteAlias(event).body) }
+//        Mockito.verify(dataFinder).updateUserInfo(userAfter)
+//
+//    }
 
 }

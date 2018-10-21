@@ -10,7 +10,7 @@ import kotlin.test.expect
 
 class S3DataFinderTest {
 
-    private var s3Client: AmazonS3 = mock()
+    private var s3Client: SimpleS3 = mock()
     private var testBucket = "testBucket"
     private var dataFinder = S3DataFinder(s3Client, testBucket)
 

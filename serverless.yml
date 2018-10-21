@@ -59,11 +59,12 @@ functions:
     events: ${self:custom.properties.events}
 
   resourceInfoFinder:
-    handler: com.cluster.api.ApiReactor
+    handler: org.http4k.serverless.lambda.LambdaFunction::handle
     environment:
       BUCKET: { Ref: Info }
       ENCRYPTION_KEY: { Ref: EncryptionKey }
       LOAD_TOPIC: { Ref: LoadTopic }
+      HTTP4K_BOOTSTRAP_CLASS: com.cluster.api.ApiReactor
     events:
       - http:
           path: /accounts/{accountId}/alias/{alias}
@@ -87,6 +88,12 @@ functions:
           path: /accounts/{accountId}/load
           cors: true
           method: post
+          authorizer:
+            arn: arn:aws:cognito-idp:eu-west-1:432337707074:userpool/eu-west-1_4KfOFr5m3
+      - http:
+          path: /accounts/{accountId}/collect
+          cors: true
+          method: get
           authorizer:
             arn: arn:aws:cognito-idp:eu-west-1:432337707074:userpool/eu-west-1_4KfOFr5m3
       - http:
